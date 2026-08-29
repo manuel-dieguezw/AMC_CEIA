@@ -1,0 +1,35 @@
+﻿# Datos y artefactos pesados (no versionar en git)
+*.npy
+*.pt
+*.pth
+*.h5
+*.ckpt
+
+# Entornos virtuales
+venv/
+.venv/
+env/
+ENV/
+
+# Cache de Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Sistema / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# Dataset original (pesado, no versionar)
+RML2016.10a_dict.pkl.zip
+RML2016.10a_dict.pkl/
+dataset-master.zip
+dataset-master/
