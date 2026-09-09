@@ -2,25 +2,31 @@
 
 Proyecto final de la Carrera de Especialización en Inteligencia Artificial (CEIA - FIUBA), enfocado en la clasificación automática de modulaciones de señales de radio utilizando el dataset **RadioML**.
 
-Se entrenaron y compararon distintas arquitecturas de deep learning (CNN, TCN, CNN-LSTM) para identificar el tipo de modulación de una señal de radio a partir de sus componentes I/Q, evaluando el desempeño en distintas condiciones de SNR (relación señal-ruido).
+Se entrenaron y compararon distintas arquitecturas de deep learning (CNN, LSTM, GRU, TCN y ULCNN) para identificar el tipo de modulación de una señal de radio a partir de sus componentes I/Q (y, en algunas variantes, de su representación Amplitud/Fase), evaluando el desempeño en distintas condiciones de SNR (relación señal-ruido). El objetivo no es solo maximizar accuracy, sino encontrar el modelo **más liviano** que cumpla el objetivo, pensando en un futuro despliegue embebido/tiempo real.
 
 ## Estructura del repositorio
 
 ```
 ├── Modelos iniciales/
-│   ├── rfml/            # Modelo CNN base + análisis exploratorio (EDA)
-│   ├── cnn_ltsm/         # Arquitectura CNN-LSTM
-│   └── tcn/              # Arquitectura TCN (Temporal Convolutional Network)
+│   ├── rfml/              # Modelo CNN base (librería rfml) + análisis exploratorio (EDA) + datos
+│   ├── common/             # Arquitecturas, carga de datos y loop de entrenamiento compartidos
+│   ├── cnn/                # Entrenamiento del modelo CNN (I/Q)
+│   ├── lstm/                # Entrenamiento del modelo LSTM (I/Q)
+│   ├── gru/                 # Entrenamiento del modelo GRU (I/Q)
+│   ├── tcn/                  # Entrenamiento del modelo TCN (I/Q)
+│   ├── cnn_ap/                # CNN, pero con representación Amplitud/Fase en vez de I/Q
+│   ├── tcn_ap/                 # TCN, pero con representación Amplitud/Fase en vez de I/Q
+│   ├── cnn_preproc/             # ULCNN — arquitectura ultra-liviana (~9k parámetros)
+│   └── comparacion/               # Compara todos los modelos ya entrenados (no reentrena)
 ├── requirements.txt       # Dependencias del proyecto
 ├── Lite_CNN.pdf            # Paper de referencia
 ├── sensors-24-07908.pdf    # Paper de referencia
 └── README.md
 ```
 
-Cada subcarpeta de `Modelos iniciales/` contiene:
-- Un notebook (`.ipynb`) con el desarrollo, entrenamiento y evaluación del modelo
-- Gráficos de resultados (accuracy vs SNR, matriz de confusión, curvas de pérdida)
-- Los pesos del modelo entrenado (`.pt`)
+Cada carpeta de arquitectura contiene un notebook que entrena **un solo modelo** (importando arquitectura, datos y loop de entrenamiento desde `common/`), sus pesos entrenados (`.pt`) y su historial de entrenamiento (`history.pkl`). `comparacion/` solo carga esos pesos y genera los gráficos comparativos (accuracy vs SNR, curvas de pérdida, matrices de confusión — globales y por rango de SNR —, accuracy vs parámetros).
+
+Ver [`Modelos iniciales/README.md`](Modelos%20iniciales/README.md) para el detalle de cada carpeta, cómo funciona `common/`, y cómo agregar una arquitectura nueva.
 
 ## Instalación
 
@@ -78,9 +84,9 @@ El archivo original está en formato pickle (`RML2016.10a_dict.pkl`); el preproc
 Abrir los notebooks en el siguiente orden sugerido:
 
 1. `Modelos iniciales/rfml/EDA_inicial.ipynb` — análisis exploratorio del dataset
-2. `Modelos iniciales/rfml/rfml.ipynb` — modelo CNN base
-3. `Modelos iniciales/cnn_ltsm/cnn_lstm.ipynb` — modelo CNN-LSTM
-4. `Modelos iniciales/tcn/tcn.ipynb` — modelo TCN
+2. `Modelos iniciales/rfml/rfml.ipynb` — modelo CNN base (librería `rfml`)
+3. `Modelos iniciales/cnn/cnn.ipynb`, `lstm/lstm.ipynb`, `gru/gru.ipynb`, `tcn/tcn.ipynb`, `cnn_ap/cnn_ap.ipynb`, `tcn_ap/tcn_ap.ipynb`, `cnn_preproc/cnn_preproc.ipynb` — entrenamiento de cada arquitectura (en cualquier orden)
+4. `Modelos iniciales/comparacion/comparacion.ipynb` — comparación entre las arquitecturas entrenadas
 
 ## Referencias
 
