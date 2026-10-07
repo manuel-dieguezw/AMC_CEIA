@@ -1,0 +1,27 @@
+{
+  "arch": "ulcnn",
+  "repr": "iq",
+  "target": "base",
+  "params": 9364,
+  "model_kwargs": {
+    "n_cv": 16,
+    "kernel_size": 5,
+    "n_fmdr": 6,
+    "shuffle_groups": 2,
+    "attn_reduction": 2
+  },
+  "lr": 0.0003,
+  "batch_size": 256,
+  "epochs": 200,
+  "patience": 20,
+  "augment": true,
+  "curriculum": false,
+  "lr_scheduler": true,
+  "seed": 42,
+  "data_source": "radioml",
+  "train_subset": null,
+  "val_subset": null,
+  "fecha": "2026-10-06T13:45:11",
+  "torch": "2.12.1+cpu",
+  "python": "3.13.14"
+}

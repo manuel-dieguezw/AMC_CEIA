@@ -1,0 +1,23 @@
+{
+  "arch": "ulcnn",
+  "repr": "iq",
+  "target": "notebook",
+  "params": 9364,
+  "model_kwargs": {
+    "n_cv": 16,
+    "kernel_size": 5,
+    "n_fmdr": 6,
+    "shuffle_groups": 2,
+    "attn_reduction": 2
+  },
+  "lr": 0.001,
+  "batch_size": 128,
+  "epochs": 200,
+  "patience": 10,
+  "augment": true,
+  "curriculum": false,
+  "curriculum_kwargs": null,
+  "seed": 42,
+  "fuente": "notebook cnn_preproc",
+  "fecha": "2026-09-23T11:43:07"
+}

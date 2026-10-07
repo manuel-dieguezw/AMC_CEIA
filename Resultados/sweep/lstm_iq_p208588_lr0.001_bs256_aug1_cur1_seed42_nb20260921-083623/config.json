@@ -1,0 +1,28 @@
+{
+  "arch": "lstm",
+  "repr": "iq",
+  "target": "notebook",
+  "params": 208588,
+  "model_kwargs": {
+    "hidden_size": 128,
+    "num_layers": 2,
+    "fc_hidden": 64,
+    "dropout": 0.5,
+    "input_norm": true
+  },
+  "lr": 0.001,
+  "batch_size": 256,
+  "epochs": 80,
+  "patience": 10,
+  "augment": true,
+  "curriculum": true,
+  "curriculum_kwargs": {
+    "group_size": 4,
+    "patience": 3,
+    "min_gain": 0.005,
+    "max_epochs_per_stage": 15
+  },
+  "seed": 42,
+  "fuente": "notebook lstm",
+  "fecha": "2026-09-21T08:36:19"
+}

@@ -1,0 +1,29 @@
+{
+  "arch": "cnn",
+  "repr": "iq",
+  "target": "base",
+  "params": 1063048,
+  "model_kwargs": {
+    "channels": [
+      64,
+      64
+    ],
+    "kernel_size": 3,
+    "fc_hidden": 128,
+    "dropout": 0.5
+  },
+  "lr": 0.0003,
+  "batch_size": 256,
+  "epochs": 200,
+  "patience": 20,
+  "augment": true,
+  "curriculum": false,
+  "lr_scheduler": true,
+  "seed": 42,
+  "data_source": "radioml",
+  "train_subset": null,
+  "val_subset": null,
+  "fecha": "2026-10-04T11:34:19",
+  "torch": "2.12.1+cpu",
+  "python": "3.13.14"
+}

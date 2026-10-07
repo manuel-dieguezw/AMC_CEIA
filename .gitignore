@@ -33,3 +33,12 @@ RML2016.10a_dict.pkl.zip
 RML2016.10a_dict.pkl/
 dataset-master.zip
 dataset-master/
+
+# Entorno virtual del proyecto (pesado)
+amc_env/
+
+# Modelos de bajo SNR (no versionar en esta etapa)
+Modelos_Bajo_SNR/
+
+# Instrucciones locales de Claude Code
+CLAUDE.md

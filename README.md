@@ -88,7 +88,4 @@ Abrir los notebooks en el siguiente orden sugerido:
 3. `Modelos iniciales/cnn/cnn.ipynb`, `lstm/lstm.ipynb`, `gru/gru.ipynb`, `tcn/tcn.ipynb`, `cnn_ap/cnn_ap.ipynb`, `tcn_ap/tcn_ap.ipynb`, `cnn_preproc/cnn_preproc.ipynb` — entrenamiento de cada arquitectura (en cualquier orden)
 4. `Modelos iniciales/comparacion/comparacion.ipynb` — comparación entre las arquitecturas entrenadas
 
-## Referencias
 
-- Lite_CNN.pdf
-- sensors-24-07908.pdf

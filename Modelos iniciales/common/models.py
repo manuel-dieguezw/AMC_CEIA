@@ -49,10 +49,18 @@ class LSTMClassifier(nn.Module):
     """LSTM para clasificación de modulaciones.
 
     `num_layers` define la profundidad de la LSTM y `hidden_size` su ancho.
+
+    `input_norm=True` agrega un `BatchNorm1d` sobre los canales I/Q antes de la recurrencia.
+    La señal de RadioML tiene amplitud minúscula (std ≈ 0.006) y, a diferencia de CNN/TCN (que
+    tienen BatchNorm tras la primera conv), la LSTM la recibe cruda: casi no hay señal para las
+    compuertas y el entrenamiento se queda en el azar mucho tiempo. Default `False` para que los
+    pesos entrenados sin normalizar sigan cargando.
     """
 
-    def __init__(self, input_size=2, hidden_size=128, num_layers=2, n_classes=8, fc_hidden=64, dropout=0.5):
+    def __init__(self, input_size=2, hidden_size=128, num_layers=2, n_classes=8, fc_hidden=64, dropout=0.5,
+                 input_norm=False):
         super().__init__()
+        self.input_norm = nn.BatchNorm1d(input_size) if input_norm else None
         self.lstm = nn.LSTM(
             input_size=input_size,
             hidden_size=hidden_size,
@@ -70,6 +78,8 @@ class LSTMClassifier(nn.Module):
         )
 
     def forward(self, x):
+        if self.input_norm is not None:
+            x = self.input_norm(x)
         x = x.permute(0, 2, 1)
         out, _ = self.lstm(x)
         return self.classifier(out[:, -1, :])
@@ -82,10 +92,16 @@ class GRUClassifier(nn.Module):
     """GRU para clasificación de modulaciones. Más rápida y estable que LSTM.
 
     `num_layers` define la profundidad de la GRU y `hidden_size` su ancho.
+
+    `input_norm=True` agrega un `BatchNorm1d` sobre los canales I/Q antes de la recurrencia
+    (ver `LSTMClassifier`: la señal cruda es demasiado chica para que la GRU arranque).
+    Default `False` para que los pesos entrenados sin normalizar sigan cargando.
     """
 
-    def __init__(self, input_size=2, hidden_size=128, num_layers=2, n_classes=8, fc_hidden=64, dropout=0.5):
+    def __init__(self, input_size=2, hidden_size=128, num_layers=2, n_classes=8, fc_hidden=64, dropout=0.5,
+                 input_norm=False):
         super().__init__()
+        self.input_norm = nn.BatchNorm1d(input_size) if input_norm else None
         self.gru = nn.GRU(
             input_size=input_size,
             hidden_size=hidden_size,
@@ -103,6 +119,8 @@ class GRUClassifier(nn.Module):
         )
 
     def forward(self, x):
+        if self.input_norm is not None:
+            x = self.input_norm(x)
         x = x.permute(0, 2, 1)  # (batch, 2, 128) -> (batch, 128, 2)
         out, _ = self.gru(x)
         return self.classifier(out[:, -1, :])
@@ -136,10 +154,14 @@ class TCN(nn.Module):
 
     `dilations` tiene un valor por bloque residual — su longitud define la
     profundidad (cada bloque dobla el campo receptivo) y `channels` el ancho.
+    `input_norm=True` agrega un `BatchNorm1d` sobre los canales de entrada antes de la
+    proyección (la señal cruda tiene amplitud ≈ 0.005; default False = arquitectura original).
     """
 
-    def __init__(self, n_classes=8, channels=64, dilations=(1, 2, 4, 8), dropout=0.2):
+    def __init__(self, n_classes=8, channels=64, dilations=(1, 2, 4, 8), dropout=0.2,
+                 input_norm=False):
         super().__init__()
+        self.input_norm = nn.BatchNorm1d(2) if input_norm else None
         self.input_proj = nn.Conv1d(2, channels, kernel_size=1)
         self.blocks = nn.Sequential(*[ResidualBlock(channels, d, dropout=dropout) for d in dilations])
         self.classifier = nn.Sequential(
@@ -149,9 +171,51 @@ class TCN(nn.Module):
         )
 
     def forward(self, x):
+        if self.input_norm is not None:
+            x = self.input_norm(x)
         x = self.input_proj(x)
         x = self.blocks(x)
         return self.classifier(x)
+
+    def count_parameters(self):
+        return sum(p.numel() for p in self.parameters() if p.requires_grad)
+
+
+class DualTCN(nn.Module):
+    """TCN de dos ramas: una sobre I/Q y otra sobre Amplitud/Fase de la MISMA señal, con una
+    cabeza de clasificación común sobre los dos embeddings concatenados.
+
+    Recibe I/Q crudo `(N, 2, L)`; A/φ se calcula adentro del `forward` (amplitud = sqrt(I²+Q²),
+    fase = atan2(Q, I), igual que `data.to_amplitude_phase`). Así se puede usar con los mismos
+    loaders, augmentation (`augment_rotate_iq`, que actúa sobre I/Q) y curriculum que el resto, y
+    al desplegar solo hace falta I/Q.
+
+    Cada rama tiene su propio `BatchNorm1d(2)` de entrada (I/Q ≈ 0.005, amplitud ≈ 0.005, fase en
+    radianes: escalas muy distintas) y su propia pila de `ResidualBlock`. `channels` es el ancho
+    de CADA rama: los parámetros son ~2x los de una `TCN` con el mismo `channels` (con
+    `channels=40` y 4 bloques queda cerca de los ~75-100k de `tcn/` y `tcn_ap/`).
+    """
+
+    def __init__(self, n_classes=8, channels=40, dilations=(1, 2, 4, 8), dropout=0.2):
+        super().__init__()
+        self.iq_branch = self._make_branch(channels, dilations, dropout)
+        self.ap_branch = self._make_branch(channels, dilations, dropout)
+        self.classifier = nn.Linear(2 * channels, n_classes)
+
+    @staticmethod
+    def _make_branch(channels, dilations, dropout):
+        return nn.Sequential(
+            nn.BatchNorm1d(2),
+            nn.Conv1d(2, channels, kernel_size=1),
+            *[ResidualBlock(channels, d, dropout=dropout) for d in dilations],
+            nn.AdaptiveAvgPool1d(1),
+            nn.Flatten(),
+        )
+
+    def forward(self, x):
+        i, q = x[:, 0], x[:, 1]
+        ap = torch.stack([torch.sqrt(i ** 2 + q ** 2), torch.atan2(q, i)], dim=1)
+        return self.classifier(torch.cat([self.iq_branch(x), self.ap_branch(ap)], dim=1))
 
     def count_parameters(self):
         return sum(p.numel() for p in self.parameters() if p.requires_grad)

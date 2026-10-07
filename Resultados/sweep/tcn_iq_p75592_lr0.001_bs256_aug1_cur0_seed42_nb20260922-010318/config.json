@@ -1,0 +1,25 @@
+{
+  "arch": "tcn",
+  "repr": "iq",
+  "target": "notebook",
+  "params": 75592,
+  "model_kwargs": {
+    "channels": 64,
+    "dilations": [
+      1,
+      2,
+      4
+    ],
+    "dropout": 0.4
+  },
+  "lr": 0.001,
+  "batch_size": 256,
+  "epochs": 50,
+  "patience": 10,
+  "augment": true,
+  "curriculum": false,
+  "curriculum_kwargs": null,
+  "seed": 42,
+  "fuente": "notebook tcn",
+  "fecha": "2026-09-22T01:03:15"
+}

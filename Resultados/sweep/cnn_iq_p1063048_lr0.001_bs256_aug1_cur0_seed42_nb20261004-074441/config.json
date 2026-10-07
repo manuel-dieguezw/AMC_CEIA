@@ -1,0 +1,27 @@
+{
+  "arch": "cnn",
+  "repr": "iq",
+  "target": "notebook",
+  "params": 1063048,
+  "model_kwargs": {
+    "channels": [
+      64,
+      64
+    ],
+    "kernel_size": 3,
+    "fc_hidden": 128,
+    "dropout": 0.5
+  },
+  "lr": 0.001,
+  "batch_size": 256,
+  "epochs": 50,
+  "patience": 10,
+  "augment": true,
+  "curriculum": false,
+  "lr_scheduler": false,
+  "curriculum_kwargs": null,
+  "data_source": "radioml",
+  "seed": 42,
+  "fuente": "notebook cnn",
+  "fecha": "2026-10-04T07:44:41"
+}

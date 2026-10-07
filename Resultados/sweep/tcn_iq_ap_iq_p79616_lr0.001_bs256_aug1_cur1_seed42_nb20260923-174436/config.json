@@ -1,0 +1,31 @@
+{
+  "arch": "tcn_iq_ap",
+  "repr": "iq",
+  "target": "notebook",
+  "params": 79616,
+  "model_kwargs": {
+    "channels": 40,
+    "dilations": [
+      1,
+      2,
+      4,
+      8
+    ],
+    "dropout": 0.2
+  },
+  "lr": 0.001,
+  "batch_size": 256,
+  "epochs": 80,
+  "patience": 10,
+  "augment": true,
+  "curriculum": true,
+  "curriculum_kwargs": {
+    "group_size": 4,
+    "patience": 3,
+    "min_gain": 0.005,
+    "max_epochs_per_stage": 15
+  },
+  "seed": 42,
+  "fuente": "notebook tcn_iq_ap",
+  "fecha": "2026-09-23T17:44:33"
+}

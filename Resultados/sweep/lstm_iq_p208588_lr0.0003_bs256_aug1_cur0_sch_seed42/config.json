@@ -1,0 +1,27 @@
+{
+  "arch": "lstm",
+  "repr": "iq",
+  "target": "base",
+  "params": 208588,
+  "model_kwargs": {
+    "hidden_size": 128,
+    "num_layers": 2,
+    "fc_hidden": 64,
+    "dropout": 0.5,
+    "input_norm": true
+  },
+  "lr": 0.0003,
+  "batch_size": 256,
+  "epochs": 200,
+  "patience": 20,
+  "augment": true,
+  "curriculum": false,
+  "lr_scheduler": true,
+  "seed": 42,
+  "data_source": "radioml",
+  "train_subset": null,
+  "val_subset": null,
+  "fecha": "2026-10-04T23:37:23",
+  "torch": "2.12.1+cpu",
+  "python": "3.13.14"
+}

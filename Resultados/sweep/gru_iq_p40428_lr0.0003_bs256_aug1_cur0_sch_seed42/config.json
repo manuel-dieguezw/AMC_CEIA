@@ -1,0 +1,27 @@
+{
+  "arch": "gru",
+  "repr": "iq",
+  "target": "base",
+  "params": 40428,
+  "model_kwargs": {
+    "hidden_size": 64,
+    "num_layers": 2,
+    "fc_hidden": 32,
+    "dropout": 0.4,
+    "input_norm": true
+  },
+  "lr": 0.0003,
+  "batch_size": 256,
+  "epochs": 200,
+  "patience": 20,
+  "augment": true,
+  "curriculum": false,
+  "lr_scheduler": true,
+  "seed": 42,
+  "data_source": "radioml",
+  "train_subset": null,
+  "val_subset": null,
+  "fecha": "2026-10-05T17:34:43",
+  "torch": "2.12.1+cpu",
+  "python": "3.13.14"
+}
