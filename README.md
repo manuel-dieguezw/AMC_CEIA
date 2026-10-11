@@ -18,6 +18,8 @@ Se entrenaron y compararon distintas arquitecturas de deep learning (CNN, LSTM, 
 │   ├── tcn_ap/                 # TCN, pero con representación Amplitud/Fase en vez de I/Q
 │   ├── cnn_preproc/             # ULCNN — arquitectura ultra-liviana (~9k parámetros)
 │   └── comparacion/               # Compara todos los modelos ya entrenados (no reentrena)
+├── Resultados/             # Etapas comparables, barrido de hiperparámetros/capacidad (sweep.py)
+├── Datos_Sinteticos/       # Generador de señales I/Q sintéticas, conectado a sweep.py
 ├── requirements.txt       # Dependencias del proyecto
 ├── Lite_CNN.pdf            # Paper de referencia
 ├── sensors-24-07908.pdf    # Paper de referencia
@@ -88,4 +90,18 @@ Abrir los notebooks en el siguiente orden sugerido:
 3. `Modelos iniciales/cnn/cnn.ipynb`, `lstm/lstm.ipynb`, `gru/gru.ipynb`, `tcn/tcn.ipynb`, `cnn_ap/cnn_ap.ipynb`, `tcn_ap/tcn_ap.ipynb`, `cnn_preproc/cnn_preproc.ipynb` — entrenamiento de cada arquitectura (en cualquier orden)
 4. `Modelos iniciales/comparacion/comparacion.ipynb` — comparación entre las arquitecturas entrenadas
 
+## Resultados y barrido de experimentos
+
+`Resultados/sweep.py` entrena configuraciones de forma independiente de los notebooks (nunca pisa
+una corrida existente) y permite comparar arquitecturas a igual cantidad de parámetros, barrer
+learning rate/batch/scheduler/curriculum, y entrenar con datos sintéticos
+(`--data-source synthetic`, generados on-the-fly con `Datos_Sinteticos/generador.py`, siempre
+evaluando sobre el test de RadioML real). Cada corrida queda en `Resultados/sweep/<id>/`.
+
+Las etapas (`Resultados/etapa_*/`) son fotos comparables de un conjunto de corridas con una
+receta fija (por ejemplo: sin augmentation/scheduler/curriculum, o con datos sintéticos). Cada
+una tiene su `metricas.json` y un `README.md` con el análisis. `Resultados/comparar_etapas.ipynb`
+compara accuracy entre etapas; `Resultados/comparar_barrido.ipynb` compara corridas dentro de un
+mismo barrido (por ejemplo, distintos learning rate). Ver [`Resultados/README.md`](Resultados/README.md)
+para el detalle de cómo leer cada corrida.
 

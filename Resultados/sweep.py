@@ -29,6 +29,10 @@ Uso (con el python del venv del proyecto):
 
     # tabla + grafico accuracy vs parametros con todo lo que haya en Resultados/sweep/
     python Resultados/sweep.py --resumen
+
+    # con datos sinteticos (Datos_Sinteticos/generador.py): train/val generados on-the-fly,
+    # test SIEMPRE es RadioML real, para que la comparacion con las corridas "radioml" sea valida
+    python Resultados/sweep.py --archs cnn tcn ulcnn --params base --data-source synthetic
 """
 import argparse
 import itertools
@@ -45,10 +49,12 @@ import torch
 ROOT = Path(__file__).resolve().parent.parent
 MI = ROOT / "Modelos iniciales"
 sys.path.insert(0, str(MI))
+sys.path.insert(0, str(ROOT / "Datos_Sinteticos"))
 
 from common.data import load_radioml_digital, split_dataset, make_loader, to_amplitude_phase, augment_rotate_iq
 from common.models import CNNBaseline, LSTMClassifier, GRUClassifier, TCN, ULCNN
 from common.train import train_model, SNRCurriculum, evaluate_by_snr, overall_accuracy
+from generador import generar_lote, config as generador_config
 
 N_CLASSES = 8
 SEED_SPLIT = 42  # el split train/val/test es siempre el mismo que en los notebooks
@@ -98,23 +104,30 @@ def jsonable(kw):
 
 def run_id(cfg):
     lr = f"{cfg['lr']:g}"
+    fuente = "_syn" if cfg["data_source"] == "synthetic" else ""
     return (f"{cfg['arch']}_{cfg['repr']}_p{cfg['params']}_lr{lr}_bs{cfg['batch_size']}"
             f"_aug{int(cfg['augment'])}_cur{int(cfg['curriculum'])}{'_sch' if cfg.get('lr_scheduler') else ''}"
-            f"_seed{cfg['seed']}")
+            f"{fuente}_seed{cfg['seed']}")
 
 
 def build_runs(args):
     runs = []
-    for arch, target, repr_, bs, aug, cur, sch, seed in itertools.product(
-            args.archs, args.params, args.repr, args.batch_sizes, args.augment, args.curriculum, args.scheduler, args.seeds):
+    for arch, target, repr_, bs, ds, cur, sch, seed in itertools.product(
+            args.archs, args.params, args.repr, args.batch_sizes, args.data_source, args.curriculum, args.scheduler, args.seeds):
         kw, n = kwargs_for_target(arch, target)
         lrs = [ARCHS[arch]["lr"]] if args.lrs == ["auto"] else [float(x) for x in args.lrs]
-        for lr in lrs:
+        # augment_rotate_iq (rotar la constelación 4x) es una augmentation de datos *reales* ya fijos;
+        # con datos sinteticos no aporta nada, porque el generador ya da un lote nuevo cada vez.
+        augs = args.augment if ds == "radioml" else [0]
+        for lr, aug in itertools.product(lrs, augs):
             epochs = max(args.epochs, 80) if cur else args.epochs
             runs.append(dict(arch=arch, repr=repr_, target=target, params=n, model_kwargs=jsonable(kw), lr=lr,
                              batch_size=bs, epochs=epochs, patience=args.patience, augment=bool(aug),
-                             curriculum=bool(cur), lr_scheduler=bool(sch), seed=seed, data_source="radioml", train_subset=args.train_subset,
-                             val_subset=args.val_subset))
+                             curriculum=bool(cur), lr_scheduler=bool(sch), seed=seed, data_source=ds,
+                             synthetic_train_samples=args.synthetic_train_samples,
+                             synthetic_val_samples=args.synthetic_val_samples,
+                             synthetic_escala=args.synthetic_escala,
+                             train_subset=args.train_subset, val_subset=args.val_subset))
     unicas = {}
     for r in runs:
         unicas.setdefault(run_id(r), r)
@@ -123,7 +136,12 @@ def build_runs(args):
 
 def prepare_data(cfg, split):
     (Xtr, ytr, str_), (Xva, yva, _), (Xte, yte, ste) = split
-    if cfg["augment"]:  # solo train; antes de pasar a A/phi porque la rotacion es sobre I/Q
+    if cfg["data_source"] == "synthetic":
+        # El test queda SIEMPRE con RadioML real (arriba); solo train/val salen del generador.
+        rng = np.random.default_rng(cfg["seed"])
+        Xtr, ytr, str_ = generar_lote(cfg["synthetic_train_samples"], rng=rng, escala=cfg["synthetic_escala"])
+        Xva, yva, _ = generar_lote(cfg["synthetic_val_samples"], rng=rng, escala=cfg["synthetic_escala"])
+    elif cfg["augment"]:  # solo train; antes de pasar a A/phi porque la rotacion es sobre I/Q
         Xtr, ytr, str_ = augment_rotate_iq(Xtr, ytr, str_)
     if cfg["repr"] == "ap":
         Xtr, Xva, Xte = to_amplitude_phase(Xtr), to_amplitude_phase(Xva), to_amplitude_phase(Xte)
@@ -169,9 +187,11 @@ def run_one(cfg, split, out_dir):
         "segundos_entrenamiento": round(train_seconds, 1),
     }
     out_dir.mkdir(parents=True, exist_ok=True)
-    (out_dir / "config.json").write_text(json.dumps(dict(cfg, fecha=datetime.now().isoformat(timespec="seconds"),
-                                                         torch=torch.__version__, python=platform.python_version()),
-                                                    indent=2, ensure_ascii=False), encoding="utf-8")
+    cfg_out = dict(cfg, fecha=datetime.now().isoformat(timespec="seconds"),
+                   torch=torch.__version__, python=platform.python_version())
+    if cfg["data_source"] == "synthetic":
+        cfg_out["generador_config"] = generador_config(semilla=cfg["seed"], escala=cfg["synthetic_escala"])
+    (out_dir / "config.json").write_text(json.dumps(cfg_out, indent=2, ensure_ascii=False), encoding="utf-8")
     (out_dir / "history.json").write_text(json.dumps({k: [float(x) for x in v] for k, v in history.items()}), encoding="utf-8")
     torch.save(model.state_dict(), out_dir / "model.pt")
     (out_dir / "metrics.json").write_text(json.dumps(metrics, indent=2), encoding="utf-8")  # marca de "terminada"
@@ -189,7 +209,8 @@ def resumen(out_root):
         cfg = json.loads((m.parent / "config.json").read_text(encoding="utf-8"))
         met = json.loads(m.read_text(encoding="utf-8"))
         rows.append(dict(run=m.parent.name, arch=cfg["arch"], repr=cfg["repr"], params=met["parametros"], lr=cfg["lr"],
-                         batch_size=cfg["batch_size"], augment=cfg["augment"], curriculum=cfg["curriculum"],
+                         batch_size=cfg["batch_size"], data_source=cfg.get("data_source", "radioml"),
+                         augment=cfg["augment"], curriculum=cfg["curriculum"],
                          seed=cfg["seed"], epocas=met["epocas_entrenadas"], acc=met["accuracy_global"],
                          acc_snr_le_m10=met["accuracy_snr_menor_igual_-10"], acc_snr_gt0=met["accuracy_snr_mayor_0"],
                          min=round(met["segundos_entrenamiento"] / 60, 1), model_kwargs=json.dumps(cfg["model_kwargs"])))
@@ -224,6 +245,13 @@ def main():
     p.add_argument("--scheduler", nargs="+", type=int, choices=[0, 1], default=[0],
                    help="ReduceLROnPlateau (factor 0.8, patience 10), como cnn_preproc")
     p.add_argument("--repr", nargs="+", choices=["iq", "ap"], default=["iq"])
+    p.add_argument("--data-source", nargs="+", choices=["radioml", "synthetic"], default=["radioml"],
+                   help='"synthetic" entrena con Datos_Sinteticos/generador.py (test SIEMPRE es RadioML real)')
+    p.add_argument("--synthetic-train-samples", type=int, default=384000,
+                   help="tamaño del train sintetico por epoca (default: igual al de RadioML aumentado 4x)")
+    p.add_argument("--synthetic-val-samples", type=int, default=32000)
+    p.add_argument("--synthetic-escala", type=float, default=0.0075,
+                   help="amplitud de la señal sintetica; ~0.0075 imita la de RadioML (std ~0.006)")
     p.add_argument("--seeds", nargs="+", type=int, default=[42])
     p.add_argument("--epochs", type=int, default=50, help="tope de epocas (con curriculum se usa max(esto, 80))")
     p.add_argument("--patience", type=int, default=10)

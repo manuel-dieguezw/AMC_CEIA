@@ -1,8 +1,14 @@
 # Datos_Sinteticos
 
 Generador de señales I/Q sintéticas (numpy/scipy) para las 8 modulaciones de RadioML 2016.10a:
-8PSK, BPSK, CPFSK, GFSK, PAM4, QAM16, QAM64, QPSK. **No está conectado a los notebooks**: es la base
-para, más adelante, entrenar con datos generados on-the-fly y usar RadioML solo para test.
+8PSK, BPSK, CPFSK, GFSK, PAM4, QAM16, QAM64, QPSK.
+
+**Conectado a `Resultados/sweep.py`** vía `--data-source synthetic`: train y val se generan
+on-the-fly con `generar_lote` (un lote nuevo por época, dataset "infinito"), y el test queda
+siempre con RadioML real, para que la comparación con las corridas `--data-source radioml` sea
+válida. Ver `Resultados/sweep.py --help` y el ejemplo en su docstring. **Todavía no está
+conectado a los notebooks** (`Modelos iniciales/`); conectarlo ahí implicaría tocar
+`common/data.py` y el loop de cada notebook, y no se hizo.
 
 ```python
 from generador import generar_lote, generador_infinito

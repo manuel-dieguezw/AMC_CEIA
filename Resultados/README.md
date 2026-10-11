@@ -4,42 +4,44 @@ Carpeta de resultados de los experimentos. Hay tres formas de guardar, según de
 
 | Qué | Dónde queda | Quién lo genera | Para qué |
 |---|---|---|---|
-| **Etapa** (foto de un conjunto de modelos) | `Resultados/<etapa>/` | `snapshot.py` | Congelar el estado de todos los modelos de los notebooks en un momento dado |
+| **Etapa** (foto comparable de un conjunto de modelos) | `Resultados/<etapa>/` | `snapshot.py` o `sweep.py` (ver más abajo) | Congelar y comparar un conjunto de modelos con una receta fija |
 | **Corrida del barrido** | `Resultados/sweep/<id>/` | `sweep.py` | Probar combinaciones de arquitectura, parámetros, lr, batch, etc. |
 | **Corrida de notebook** | `Resultados/sweep/<id>_nb<fecha-hora>/` | `celda_guardar_corrida.py` (pegada al final del notebook) | Guardar una corrida hecha a mano en el notebook, con el mismo formato que el barrido |
 
 ## Diferencia entre `sweep.py` y `snapshot.py`
 
-- **`snapshot.py` congela lo que ya existe.** Toma los `.pt`, `history.pkl`, gráficos y notebooks de las carpetas `Modelos iniciales/` y `Modelos_Bajo_SNR/`, los copia a `Resultados/<etapa>/` y calcula sus métricas. No entrena nada. Sirve para tener una "foto" de cada etapa del proyecto (antes de augmentation, después, etc.) sin que se pisen entre sí.
-- **`sweep.py` entrena cosas nuevas.** Recorre una grilla de configuraciones (arquitectura, cantidad de parámetros, lr, batch, augmentation, curriculum, scheduler), entrena cada una y guarda el resultado en `sweep/`. Es independiente de los notebooks: no toca sus carpetas ni sus archivos.
+- **`snapshot.py` congela lo que ya existe.** Toma los `.pt`, `history.pkl`, gráficos y notebooks de las carpetas `Modelos iniciales/` y `Modelos_Bajo_SNR/`, los copia a `Resultados/<etapa>/` y calcula sus métricas. No entrena nada. Sirve para tener una "foto" de los modelos que corriste a mano en Jupyter.
+- **`sweep.py` entrena cosas nuevas.** Recorre una grilla de configuraciones (arquitectura, cantidad de parámetros, lr, batch, augmentation, curriculum, scheduler, fuente de datos), entrena cada una y guarda el resultado en `sweep/`. Es independiente de los notebooks: no toca sus carpetas ni sus archivos.
 
 En corto: `snapshot` = copiar y medir modelos ya entrenados por los notebooks; `sweep` = entrenar y medir configuraciones nuevas.
 
 ## Etapas (`<etapa>/`)
 
-Cada etapa tiene:
+Hay dos orígenes posibles para una etapa, y no se mezclan:
 
-```
-<etapa>/
-  metricas.json                 # resumen de todos los modelos de la etapa
-  Modelos iniciales/<modelo>/   # .pt, history.pkl, .png, notebook
-  Modelos_Bajo_SNR/<modelo>/    # idem
-```
+- **Basada en `snapshot.py`** (la original): copia `.pt`, `history.pkl`, gráficos y notebook de cada modelo.
+  ```
+  <etapa>/
+    metricas.json                 # resumen de todos los modelos de la etapa
+    Modelos iniciales/<modelo>/   # .pt, history.pkl, .png, notebook
+    Modelos_Bajo_SNR/<modelo>/    # idem
+  ```
+  Crear una: `python Resultados/snapshot.py <nombre> --grupos "Modelos iniciales"`. Aborta si la etapa ya existe (`--sobrescribir` para forzarlo, no conviene). Los modelos nuevos hay que registrarlos en `SPECS` de `snapshot.py`, o aparecen como `SIN SPEC`.
+  Etapas de este tipo: `etapa_0_original/`, `etapa_1_augmentation_curriculum/` (ambas quedaron como respaldo de un camino anterior; no son la referencia actual).
 
-`metricas.json` tiene `etapa` y `modelos`. Por cada modelo: accuracy global, accuracy por SNR, accuracy a SNR ≤ -10 dB y cantidad de parámetros. Se calcula evaluando cada modelo en el test set.
+- **Basada en `sweep.py`** (la que se usa ahora para comparar etapas): no copia `.pt` ni notebooks; `metricas.json` se arma a mano a partir de las corridas de `sweep/` correspondientes (ver el campo `fuente` de cada modelo dentro de `metricas.json`). Cada una tiene su propio `README.md` con el comando exacto, la tabla de resultados y el análisis.
+  ```
+  <etapa>/
+    metricas.json   # {"etapa": ..., "fuente": "Resultados/sweep (sweep.py)...", "modelos": {...}}
+    README.md       # comando, tabla de resultados, comparación con la etapa anterior
+  ```
+  Etapas de este tipo, en orden (todas con batch 256, lr 1e-3, config `base` de cada arquitectura):
+  - **`etapa_0_baseline/`**: sin augmentation, sin scheduler, sin curriculum. La LSTM colapsa (ver su README).
+  - **`etapa_1_augmentation_scheduler/`**: + augmentation + scheduler. Mejora a las cinco arquitecturas.
+  - **`etapa_2_curriculum/`**: + curriculum por SNR. Empeora a las cinco; colapsa al TCN.
+  - **`etapa_3_sintetico_curriculum/`**: igual que la etapa 2, pero train/val son sintéticos (`Datos_Sinteticos/generador.py`); el test sigue siendo RadioML real. El TCN no colapsa, pero el resto rinde algo peor que con datos reales.
 
-Etapas existentes:
-
-- **`etapa_0_baseline/`**: los 13 modelos antes de augmentation y curriculum. El notebook de `Modelos iniciales` se toma de git (commit `b9f488c`).
-- **`tcn_curriculum_fallido/`**: un `tcn.pt` y su `history.pkl` de una corrida con curriculum que salió mal. Se conserva como referencia; no es una etapa completa.
-
-Crear una etapa nueva:
-
-```bash
-python Resultados/snapshot.py etapa_1_augmentation_curriculum --grupos "Modelos iniciales"
-```
-
-El script aborta si la etapa ya existe (no pisa nada). Para forzarlo está `--sobrescribir`, que no conviene usar. Los modelos nuevos hay que registrarlos en `SPECS` de `snapshot.py`; si no, aparecen como `SIN SPEC`.
+  Para comparar accuracy entre estas cuatro, usar `Resultados/comparar_etapas.ipynb` (lee los `metricas.json`, no entrena nada).
 
 ## Corridas (`sweep/<id>/`)
 
@@ -70,34 +72,39 @@ gru_iq_p40428_lr0.001_bs64_aug1_cur1_seed42
 - **arquitectura**: `cnn`, `lstm`, `gru`, `tcn`, `ulcnn`.
 - **repr**: `iq` o `ap` (amplitud/fase), o el nombre de la representación si es de bajo SNR. Va justo después de la arquitectura.
 - **`p<params>`**: parámetros reales, no el objetivo del barrido.
-- **`_sch`** al final: se agregó si el `ReduceLROnPlateau` estaba activo (`lr_scheduler`).
-- **`_nb<fecha-hora>`** al final: corrida guardada desde un notebook. Lleva la fecha y hora para que dos corridas con la misma configuración no se pisen.
+- **`_sch`**: se agregó si el `ReduceLROnPlateau` estaba activo (`lr_scheduler`).
+- **`_syn`**: la corrida entrenó con datos sintéticos (`--data-source synthetic`); el test sigue siendo RadioML real. Sin este sufijo, la fuente es RadioML real.
+- **`_nb<fecha-hora>`** al final: corrida guardada desde un notebook (`celda_guardar_corrida.py`), no desde `sweep.py`. Lleva la fecha y hora para que dos corridas con la misma configuración no se pisen.
 
-Si una corrida tiene la misma configuración que otra, la carpeta es la misma y el barrido la salta (no la vuelve a entrenar).
+Si una corrida tiene la misma configuración que otra (mismo `run_id`, sin contar `_nb<fecha-hora>`), la carpeta es la misma y el barrido la salta (no la vuelve a entrenar).
 
 ### Corridas actuales
 
-| Id (resumido) | Params | Global | ≤ -10 dB | > 0 dB | Nota |
-|---|---|---|---|---|---|
-| gru_iq, bs64, cur1 | 40.428 | 0.665 | 0.155 | 0.973 | |
-| tcn_iq, cur0 | 75.592 | 0.636 | 0.154 | 0.953 | sin curriculum |
-| tcn_iq_ap_iq | 79.616 | 0.649 | 0.152 | 0.976 | nombre engañoso: es un TCN, no la fusión I/Q+AP |
-| tcn_ap | 100.552 | 0.647 | 0.146 | 0.971 | |
-| tcn_iq, cur1 | 75.596 | 0.619 | 0.134 | 0.945 | |
-| ulcnn, cur0 (dos corridas) | 9.364 | 0.633 | 0.171 | 0.933 | duplicada en otra fecha |
-| lstm, cur1 (dos corridas) | 208.588 | 0.608 | 0.154 | 0.867 | duplicada, mismos números |
-| tcn_iq, cur1 (dos corridas) | 75.592 | 0.254 / 0.179 | 0.137 / 0.127 | 0.361 / 0.190 | **fallidas** |
+Hay más de 40 carpetas en `sweep/`, de distintos barridos (learning rate, capacidad, datos sintéticos, curriculum, algunas fallidas o duplicadas de pruebas anteriores). Para verlas todas:
+
+```bash
+python Resultados/sweep.py --resumen
+```
+
+Eso junta todas las corridas completas (con `metrics.json`) en `sweep/resumen.csv` y el gráfico `sweep/accuracy_vs_parametros.png`. Para comparar un subconjunto puntual (por ejemplo, los dos learning rate de un barrido), usar `Resultados/comparar_barrido.ipynb`, que filtra por receta en vez de mezclar todo.
 
 Notas:
 
-- `segundos_entrenamiento` vale 0 en todas las corridas: el tiempo no se está midiendo bien.
-- Las corridas con `cur1` no son comparables directamente con las `cur0`, porque cambia la receta de entrenamiento.
+- `segundos_entrenamiento` vale 0 en las corridas guardadas desde un notebook (`_nb...`): el notebook no mide el tiempo. Las corridas de `sweep.py` sí lo miden.
+- Corridas con receta distinta (augmentation, curriculum, scheduler, batch, fuente de datos) no son comparables entre sí directamente — hay que fijarse en los flags del nombre o en `config.json` antes de comparar dos corridas.
 
 ## Resumen y gráficos
 
 `python Resultados/sweep.py --resumen` recorre `sweep/*/metrics.json` y genera:
 
-- `sweep/resumen.csv`: una fila por corrida con arquitectura, parámetros, lr, batch, augmentation, curriculum, accuracy global, a ≤ -10 dB, a > 0 dB, épocas y minutos.
+- `sweep/resumen.csv`: una fila por corrida con arquitectura, parámetros, lr, batch, fuente de datos (`data_source`), augmentation, curriculum, accuracy global, a ≤ -10 dB, a > 0 dB, épocas y minutos.
 - `sweep/accuracy_vs_parametros.png`: accuracy vs cantidad de parámetros.
 
 Las corridas incompletas (sin `metrics.json`) se ignoran.
+
+## Notebooks de comparación
+
+- **`Resultados/comparar_barrido.ipynb`**: compara corridas de `sweep/` dentro de una misma receta (por ejemplo, los dos learning rate de un barrido). Filtra por `curriculum`/`batch`/`augment`/`scheduler` para no mezclar recetas distintas.
+- **`Resultados/comparar_etapas.ipynb`**: compara accuracy entre las etapas basadas en `sweep.py` (`etapa_0_baseline` a `etapa_3_sintetico_curriculum`), una al lado de la otra, por arquitectura.
+
+Ninguno de los dos entrena ni modifica nada; solo leen `metrics.json`/`metricas.json`.
