@@ -35,11 +35,26 @@ Hay dos orígenes posibles para una etapa, y no se mezclan:
     metricas.json   # {"etapa": ..., "fuente": "Resultados/sweep (sweep.py)...", "modelos": {...}}
     README.md       # comando, tabla de resultados, comparación con la etapa anterior
   ```
-  Etapas de este tipo, en orden (todas con batch 256, lr 1e-3, config `base` de cada arquitectura):
-  - **`etapa_0_baseline/`**: sin augmentation, sin scheduler, sin curriculum. La LSTM colapsa (ver su README).
-  - **`etapa_1_augmentation_scheduler/`**: + augmentation + scheduler. Mejora a las cinco arquitecturas.
-  - **`etapa_2_curriculum/`**: + curriculum por SNR. Empeora a las cinco; colapsa al TCN.
-  - **`etapa_3_sintetico_curriculum/`**: igual que la etapa 2, pero train/val son sintéticos (`Datos_Sinteticos/generador.py`); el test sigue siendo RadioML real. El TCN no colapsa, pero el resto rinde algo peor que con datos reales.
+  Etapas de este tipo, en orden (todas con batch 256, lr 1e-3, config `base` de cada arquitectura,
+  test siempre RadioML real):
+
+  | Etapa | Receta | CNN | LSTM | GRU | TCN | ULCNN |
+  |---|---|---|---|---|---|---|
+  | `etapa_0_baseline/` | sin augmentation, sin scheduler, sin curriculum | 0.490 | **0.179 (colapsa)** | 0.603 | 0.625 | 0.584 |
+  | `etapa_1_augmentation_scheduler/` | + augmentation + scheduler | 0.521 | 0.675 | 0.677 | 0.645 | 0.647 |
+  | `etapa_2_curriculum/` | + curriculum por SNR (datos reales) | 0.484 | 0.673 | 0.600 | **0.213 (colapsa)** | 0.600 |
+  | `etapa_3_sintetico_curriculum/` | igual que la 2, pero train/val sintéticos | 0.458 | 0.569 | 0.560 | 0.489 | 0.556 |
+
+  (accuracy global en el test de RadioML real; el detalle y la accuracy a SNR ≤ -10 dB están en
+  el `README.md` de cada etapa)
+
+  - **`etapa_0_baseline/`**: receta original, sin agregados. La LSTM colapsa (train loss clavado en `ln(8)`, nunca aprende) — el mismo problema que documentaron los notebooks con lr 1e-3 sin normalizar el lr.
+  - **`etapa_1_augmentation_scheduler/`**: + augmentation (rotación I/Q, train 4x) + `ReduceLROnPlateau`. Mejora a las cinco arquitecturas; a la LSTM la saca del colapso.
+  - **`etapa_2_curriculum/`**: + curriculum por SNR (entrenar de SNR alto a bajo). Con RadioML real, **empeora a las cinco y colapsa al TCN** (0.645 → 0.213): se sobreajusta a cada grupo de SNR y no generaliza al sumar el siguiente.
+  - **`etapa_3_sintetico_curriculum/`**: misma receta que la etapa 2, pero train/val se generan on-the-fly con `Datos_Sinteticos/generador.py` (test sigue siendo RadioML real). El TCN **no** colapsa (0.489), lo que sugiere que el colapso de la etapa 2 tiene que ver con algo de RadioML real que el generador no modela (fading, offset de reloj). El resto rinde un poco peor que con datos reales (el generador no tiene esos efectos de canal).
+
+  Falta la variante "datos sintéticos sin curriculum" (`--data-source synthetic --curriculum 0`),
+  que aislaría si la diferencia de la etapa 3 viene del curriculum o de la fuente de datos.
 
   Para comparar accuracy entre estas cuatro, usar `Resultados/comparar_etapas.ipynb` (lee los `metricas.json`, no entrena nada).
 
