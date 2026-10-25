@@ -17,6 +17,7 @@ Modelos iniciales/
 ├── cnn_ap/          # CNNBaseline, pero con representación Amplitud/Fase en vez de I/Q
 ├── tcn_ap/          # TCN, pero con representación Amplitud/Fase en vez de I/Q
 ├── cnn_preproc/     # ULCNN — arquitectura ultra-liviana (conv. compleja + depthwise/attention)
+├── tcn_iq_ap/       # DualTCN — recibe I/Q crudo, calcula A/φ internamente y combina ambas ramas
 └── comparacion/     # No entrena nada: carga todos los .pt y compara
 ```
 
@@ -29,8 +30,9 @@ Modelos iniciales/
 2. **`rfml/rfml.ipynb`** — CNN baseline con la librería `rfml`. Es un caso aparte, no comparte
    código con el resto.
 3. **Cualquier orden**: `cnn/cnn.ipynb`, `lstm/lstm.ipynb`, `gru/gru.ipynb`, `tcn/tcn.ipynb`,
-   `cnn_ap/cnn_ap.ipynb`, `tcn_ap/tcn_ap.ipynb`, `cnn_preproc/cnn_preproc.ipynb` — cada uno
-   entrena su modelo y guarda `<nombre>.pt` + `history.pkl` en su propia carpeta.
+   `cnn_ap/cnn_ap.ipynb`, `tcn_ap/tcn_ap.ipynb`, `cnn_preproc/cnn_preproc.ipynb`,
+   `tcn_iq_ap/tcn_iq_ap.ipynb` — cada uno entrena su modelo y guarda `<nombre>.pt` +
+   `history.pkl` en su propia carpeta.
 4. **`comparacion/comparacion.ipynb`** — al final, una vez entrenados los modelos que quieras
    comparar. Carga los `.pt`/`history.pkl` correspondientes y genera accuracy vs SNR, curvas de
    pérdida, matrices de confusión (globales y por rango de SNR) y accuracy vs cantidad de
@@ -40,14 +42,22 @@ Modelos iniciales/
 
 Para no duplicar arquitecturas ni loops de entrenamiento entre notebooks:
 
-- **`models.py`** — `CNNBaseline`, `LSTMClassifier`, `GRUClassifier`, `TCN` y `ULCNN`. Todas
+- **`models.py`** — `CNNBaseline`, `LSTMClassifier`, `GRUClassifier`, `TCN`, `ULCNN` y `DualTCN`
+  (rama I/Q + rama A/φ combinadas antes de clasificar, usada por `tcn_iq_ap/`). Todas
   configurables vía argumentos del constructor (profundidad/ancho) — los defaults reproducen la
   arquitectura con la que ya hay pesos entrenados.
 - **`data.py`** — `load_radioml_digital` (carga + shuffle), `split_dataset` (60/20/20
   estratificado), `make_loader`, `to_amplitude_phase` (I/Q → Amplitud/Fase), `augment_rotate_iq`
-  (data augmentation por rotación de constelación, usada por `cnn_preproc/`).
-- **`train.py`** — `train_model` (con `EarlyStopping` y `ReduceLROnPlateau` opcional),
-  `evaluate_by_snr`, `overall_accuracy`, `compute_cm`.
+  (data augmentation por rotación de constelación).
+- **`train.py`** — `train_model` (con `EarlyStopping`, `ReduceLROnPlateau` opcional vía
+  `use_lr_scheduler`, curriculum por SNR opcional vía `curriculum` — ver `SNRCurriculum` — y un
+  hook `train_loader_fn` para generar datos sintéticos por época), `evaluate_by_snr`,
+  `overall_accuracy`, `compute_cm`.
+
+Los 7 notebooks (todos salvo `tcn_iq_ap/`, pendiente de agregarle `SCHEDULER`) comparten una
+receta común con flags en la celda de configuración: `AUGMENT`, `SCHEDULER`, `USE_CURRICULUM`
+(default `True`/`True`/`False`) y `DATA_SOURCE` (`"radioml"` o `"synthetic"`, generado on-the-fly
+con `../../Datos_Sinteticos/generador.py`).
 
 ## Cada notebook de entrenamiento
 

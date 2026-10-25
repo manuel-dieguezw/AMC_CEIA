@@ -32,17 +32,13 @@ import torch
 
 ROOT = Path(__file__).resolve().parent.parent
 MI = ROOT / "Modelos iniciales"
-MB = ROOT / "Modelos_Bajo_SNR"
 sys.path.insert(0, str(MI))
-sys.path.insert(0, str(MB))
 
 from common.data import load_radioml_digital, split_dataset, to_amplitude_phase
-from common.models import CNNBaseline, LSTMClassifier, GRUClassifier, TCN, ULCNN
+from common.models import CNNBaseline, LSTMClassifier, GRUClassifier, TCN, ULCNN, DualTCN
 from common.train import evaluate_by_snr, overall_accuracy
-from common_snr.features import compute_hos_features, compute_stft, compute_cwt, pack_fusion_features
-from common_snr.models import HOSClassifier, STFTCNN, SpectrogramULCNN, CNNLSTMHybrid, FusionClassifier
 
-# (grupo, carpeta, clase, nombre_pt, representacion) — representacion: iq | ap | hos | stft | wavelet | fusion
+# (grupo, carpeta, clase, nombre_pt, representacion) — representacion: iq | ap
 # Para agregar un modelo nuevo: importar su clase arriba y sumar una linea aca.
 SPECS = [
     ("Modelos iniciales", "cnn", CNNBaseline, "cnn.pt", "iq"),
@@ -52,16 +48,11 @@ SPECS = [
     ("Modelos iniciales", "cnn_ap", CNNBaseline, "cnn_ap.pt", "ap"),
     ("Modelos iniciales", "tcn_ap", TCN, "tcn_ap.pt", "ap"),
     ("Modelos iniciales", "cnn_preproc", ULCNN, "cnn_preproc.pt", "iq"),
-    ("Modelos_Bajo_SNR", "hos", HOSClassifier, "hos.pt", "hos"),
-    ("Modelos_Bajo_SNR", "stft", STFTCNN, "stft.pt", "stft"),
-    ("Modelos_Bajo_SNR", "wavelet", STFTCNN, "wavelet.pt", "wavelet"),
-    ("Modelos_Bajo_SNR", "lstm_snr", CNNLSTMHybrid, "lstm_snr.pt", "iq"),
-    ("Modelos_Bajo_SNR", "stft_ulcnn", SpectrogramULCNN, "stft_ulcnn.pt", "stft"),
-    ("Modelos_Bajo_SNR", "fusion", FusionClassifier, "fusion.pt", "fusion"),
+    ("Modelos iniciales", "tcn_iq_ap", DualTCN, "tcn_iq_ap.pt", "iq"),
 ]
 GRUPOS = sorted({s[0] for s in SPECS})
 # rfml/ es el baseline con la libreria externa (sin history.pkl ni clases de common/): no se snapshotea.
-IGNORAR = {"common", "common_snr", "comparacion", "rfml", "__pycache__"}
+IGNORAR = {"common", "comparacion", "rfml", "__pycache__"}
 
 parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
 parser.add_argument("etapa")
@@ -93,15 +84,6 @@ def get_rep(name):
         reps[name] = X_test
     elif name == "ap":
         reps[name] = to_amplitude_phase(X_test)
-    elif name == "hos":
-        reps[name] = compute_hos_features(X_test)
-    elif name == "stft":
-        reps[name] = compute_stft(X_test)
-    elif name == "wavelet":
-        print("calculando CWT del test set (~1 min)...")
-        reps[name] = compute_cwt(X_test)
-    elif name == "fusion":
-        reps[name] = pack_fusion_features(X_test, get_rep("hos"), get_rep("stft"))
     else:
         raise ValueError(f"representacion desconocida: {name}")
     return reps[name]

@@ -1,0 +1,33 @@
+{
+  "arch": "gru",
+  "repr": "iq",
+  "target": "9364",
+  "params": 9267,
+  "model_kwargs": {
+    "hidden_size": 30,
+    "num_layers": 2,
+    "fc_hidden": 15,
+    "dropout": 0.4,
+    "input_norm": true
+  },
+  "lr": 0.001,
+  "batch_size": 256,
+  "epochs": 150,
+  "patience": 10,
+  "augment": true,
+  "curriculum": false,
+  "curriculum_mode": "acc",
+  "curriculum_epochs_per_stage": 10,
+  "lr_scheduler": true,
+  "seed": 42,
+  "data_source": "radioml",
+  "synthetic_train_samples": 384000,
+  "synthetic_val_samples": 32000,
+  "synthetic_escala": 0.0075,
+  "train_subset": null,
+  "val_subset": null,
+  "fecha": "2026-10-19T01:36:45",
+  "torch": "2.4.1+cpu",
+  "python": "3.12.10",
+  "device": "cpu"
+}

@@ -10,7 +10,7 @@ Carpeta de resultados de los experimentos. Hay tres formas de guardar, según de
 
 ## Diferencia entre `sweep.py` y `snapshot.py`
 
-- **`snapshot.py` congela lo que ya existe.** Toma los `.pt`, `history.pkl`, gráficos y notebooks de las carpetas `Modelos iniciales/` y `Modelos_Bajo_SNR/`, los copia a `Resultados/<etapa>/` y calcula sus métricas. No entrena nada. Sirve para tener una "foto" de los modelos que corriste a mano en Jupyter.
+- **`snapshot.py` congela lo que ya existe.** Toma los `.pt`, `history.pkl`, gráficos y notebooks de las carpetas de `Modelos iniciales/`, los copia a `Resultados/<etapa>/` y calcula sus métricas. No entrena nada. Sirve para tener una "foto" de los modelos que corriste a mano en Jupyter.
 - **`sweep.py` entrena cosas nuevas.** Recorre una grilla de configuraciones (arquitectura, cantidad de parámetros, lr, batch, augmentation, curriculum, scheduler, fuente de datos), entrena cada una y guarda el resultado en `sweep/`. Es independiente de los notebooks: no toca sus carpetas ni sus archivos.
 
 En corto: `snapshot` = copiar y medir modelos ya entrenados por los notebooks; `sweep` = entrenar y medir configuraciones nuevas.
@@ -24,10 +24,9 @@ Hay dos orígenes posibles para una etapa, y no se mezclan:
   <etapa>/
     metricas.json                 # resumen de todos los modelos de la etapa
     Modelos iniciales/<modelo>/   # .pt, history.pkl, .png, notebook
-    Modelos_Bajo_SNR/<modelo>/    # idem
   ```
-  Crear una: `python Resultados/snapshot.py <nombre> --grupos "Modelos iniciales"`. Aborta si la etapa ya existe (`--sobrescribir` para forzarlo, no conviene). Los modelos nuevos hay que registrarlos en `SPECS` de `snapshot.py`, o aparecen como `SIN SPEC`.
-  Etapas de este tipo: `etapa_0_original/`, `etapa_1_augmentation_curriculum/` (ambas quedaron como respaldo de un camino anterior; no son la referencia actual).
+  Crear una: `python Resultados/snapshot.py <nombre>`. Aborta si la etapa ya existe (`--sobrescribir` para forzarlo, no conviene). Los modelos nuevos hay que registrarlos en `SPECS` de `snapshot.py`, o aparecen como `SIN SPEC`.
+  Etapas de este tipo: `etapa_0_original/`, `etapa_1_augmentation_curriculum/` (ambas quedaron como respaldo de un camino anterior; no son la referencia actual — `etapa_0_original/` además incluye, como registro histórico, una carpeta `Modelos_Bajo_SNR/` de un camino de exploración que ya no se mantiene).
 
 - **Basada en `sweep.py`** (la que se usa ahora para comparar etapas): no copia `.pt` ni notebooks; `metricas.json` se arma a mano a partir de las corridas de `sweep/` correspondientes (ver el campo `fuente` de cada modelo dentro de `metricas.json`). Cada una tiene su propio `README.md` con el comando exacto, la tabla de resultados y el análisis.
   ```
@@ -42,21 +41,24 @@ Hay dos orígenes posibles para una etapa, y no se mezclan:
   |---|---|---|---|---|---|---|
   | `etapa_0_baseline/` | sin augmentation, sin scheduler, sin curriculum | 0.490 | **0.179 (colapsa)** | 0.603 | 0.625 | 0.584 |
   | `etapa_1_augmentation_scheduler/` | + augmentation + scheduler | 0.521 | 0.675 | 0.677 | 0.645 | 0.647 |
-  | `etapa_2_curriculum/` | + curriculum por SNR (datos reales) | 0.484 | 0.673 | 0.600 | **0.213 (colapsa)** | 0.600 |
-  | `etapa_3_sintetico_curriculum/` | igual que la 2, pero train/val sintéticos | 0.458 | 0.569 | 0.560 | 0.489 | 0.556 |
+  | `etapa_2_curriculum/` | + curriculum por SNR (datos reales, corte por `acc`) | 0.484 | 0.673 | 0.600 | **0.213 (colapsa)** | 0.600 |
+  | `etapa_3_sintetico_curriculum/` | igual que la 2, pero train/val sintéticos (obsoleta, lote fijo) | 0.458 | 0.569 | 0.560 | 0.489 | 0.556 |
+  | `etapa_4_curriculum_fixed/` | curriculum con corte fijo por épocas (`--curriculum-mode fixed`) | 0.547 | 0.677 | 0.673 | 0.632 | 0.632 |
+  | `etapa_5_curriculum_stage_val/` | curriculum con validación por rango de SNR visto (`--curriculum-mode stage_val`) | 0.417 | 0.672 | 0.598 | 0.605 | 0.614 |
 
   (accuracy global en el test de RadioML real; el detalle y la accuracy a SNR ≤ -10 dB están en
   el `README.md` de cada etapa)
 
   - **`etapa_0_baseline/`**: receta original, sin agregados. La LSTM colapsa (train loss clavado en `ln(8)`, nunca aprende) — el mismo problema que documentaron los notebooks con lr 1e-3 sin normalizar el lr.
   - **`etapa_1_augmentation_scheduler/`**: + augmentation (rotación I/Q, train 4x) + `ReduceLROnPlateau`. Mejora a las cinco arquitecturas; a la LSTM la saca del colapso.
-  - **`etapa_2_curriculum/`**: + curriculum por SNR (entrenar de SNR alto a bajo). Con RadioML real, **empeora a las cinco y colapsa al TCN** (0.645 → 0.213): se sobreajusta a cada grupo de SNR y no generaliza al sumar el siguiente.
-  - **`etapa_3_sintetico_curriculum/`**: misma receta que la etapa 2, pero train/val se generan on-the-fly con `Datos_Sinteticos/generador.py` (test sigue siendo RadioML real). El TCN **no** colapsa (0.489), lo que sugiere que el colapso de la etapa 2 tiene que ver con algo de RadioML real que el generador no modela (fading, offset de reloj). El resto rinde un poco peor que con datos reales (el generador no tiene esos efectos de canal).
+  - **`etapa_2_curriculum/`**: + curriculum por SNR (entrenar de SNR alto a bajo), con el criterio de corte original (`acc`: val accuracy sobre todos los SNR). Con RadioML real, **empeora a las cinco y colapsa al TCN** (0.645 → 0.213): se sobreajusta a cada grupo de SNR y no generaliza al sumar el siguiente.
+  - **`etapa_3_sintetico_curriculum/`**: misma receta que la etapa 2, pero train/val se generan con `Datos_Sinteticos/generador.py` (test sigue siendo RadioML real). **Obsoleta**: usa el bug corregido después (un único lote fijo de datos sintéticos para toda la corrida, en vez de uno nuevo por época) — queda como registro histórico, no como referencia. El TCN **no** colapsa (0.489) con ese lote fijo, lo que en su momento sugirió que el colapso de la etapa 2 tenía que ver con algo de RadioML real que el generador no modela (fading, offset de reloj).
+  - **`etapa_4_curriculum_fixed/`**: corrige el criterio de corte de la etapa 2 — en vez de mirar val accuracy, cada etapa del curriculum entrena un número fijo de épocas (`--curriculum-epochs-per-stage`). **Resuelve el colapso del TCN** (0.632) y queda dentro de ±0.03 de la etapa 1 en las cinco arquitecturas, sin mejora clara y consistente sobre no usar curriculum.
+  - **`etapa_5_curriculum_stage_val/`**: segunda alternativa al criterio de corte — valida cada etapa solo con las muestras de val en el rango de SNR ya visto (el val set completo se usa solo para elegir el checkpoint final). También evita el colapso del TCN (0.605), pero corta demasiado temprano (30-51 épocas vs las 100 fijas de `fixed`) y queda peor que `etapa_4` en 4 de las 5 arquitecturas.
 
-  Falta la variante "datos sintéticos sin curriculum" (`--data-source synthetic --curriculum 0`),
-  que aislaría si la diferencia de la etapa 3 viene del curriculum o de la fuente de datos.
+  **Conclusión: ninguno de los tres modos de curriculum (`acc`/`fixed`/`stage_val`) justifica usarlo en la comparación principal** del informe; si se reporta uno, usar `fixed` (etapa 4).
 
-  Para comparar accuracy entre estas cuatro, usar `Resultados/comparar_etapas.ipynb` (lee los `metricas.json`, no entrena nada).
+  Para comparar accuracy entre estas etapas, usar `Resultados/comparar_etapas.ipynb` (lee los `metricas.json`, no entrena nada).
 
 ## Corridas (`sweep/<id>/`)
 

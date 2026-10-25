@@ -17,12 +17,11 @@ Se entrenaron y compararon distintas arquitecturas de deep learning (CNN, LSTM, 
 │   ├── cnn_ap/                # CNN, pero con representación Amplitud/Fase en vez de I/Q
 │   ├── tcn_ap/                 # TCN, pero con representación Amplitud/Fase en vez de I/Q
 │   ├── cnn_preproc/             # ULCNN — arquitectura ultra-liviana (~9k parámetros)
+│   ├── tcn_iq_ap/                # DualTCN — combina ramas I/Q y Amplitud/Fase antes de clasificar
 │   └── comparacion/               # Compara todos los modelos ya entrenados (no reentrena)
 ├── Resultados/             # Etapas comparables, barrido de hiperparámetros/capacidad (sweep.py)
-├── Datos_Sinteticos/       # Generador de señales I/Q sintéticas, conectado a sweep.py
+├── Datos_Sinteticos/       # Generador de señales I/Q sintéticas, conectado a sweep.py y a los notebooks
 ├── requirements.txt       # Dependencias del proyecto
-├── Lite_CNN.pdf            # Paper de referencia
-├── sensors-24-07908.pdf    # Paper de referencia
 └── README.md
 ```
 
@@ -87,7 +86,7 @@ Abrir los notebooks en el siguiente orden sugerido:
 
 1. `Modelos iniciales/rfml/EDA_inicial.ipynb` — análisis exploratorio del dataset
 2. `Modelos iniciales/rfml/rfml.ipynb` — modelo CNN base (librería `rfml`)
-3. `Modelos iniciales/cnn/cnn.ipynb`, `lstm/lstm.ipynb`, `gru/gru.ipynb`, `tcn/tcn.ipynb`, `cnn_ap/cnn_ap.ipynb`, `tcn_ap/tcn_ap.ipynb`, `cnn_preproc/cnn_preproc.ipynb` — entrenamiento de cada arquitectura (en cualquier orden)
+3. `Modelos iniciales/cnn/cnn.ipynb`, `lstm/lstm.ipynb`, `gru/gru.ipynb`, `tcn/tcn.ipynb`, `cnn_ap/cnn_ap.ipynb`, `tcn_ap/tcn_ap.ipynb`, `cnn_preproc/cnn_preproc.ipynb`, `tcn_iq_ap/tcn_iq_ap.ipynb` — entrenamiento de cada arquitectura (en cualquier orden)
 4. `Modelos iniciales/comparacion/comparacion.ipynb` — comparación entre las arquitecturas entrenadas
 
 ## Resultados y barrido de experimentos

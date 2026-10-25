@@ -6,9 +6,13 @@ Generador de señales I/Q sintéticas (numpy/scipy) para las 8 modulaciones de R
 **Conectado a `Resultados/sweep.py`** vía `--data-source synthetic`: train y val se generan
 on-the-fly con `generar_lote` (un lote nuevo por época, dataset "infinito"), y el test queda
 siempre con RadioML real, para que la comparación con las corridas `--data-source radioml` sea
-válida. Ver `Resultados/sweep.py --help` y el ejemplo en su docstring. **Todavía no está
-conectado a los notebooks** (`Modelos iniciales/`); conectarlo ahí implicaría tocar
-`common/data.py` y el loop de cada notebook, y no se hizo.
+válida. Ver `Resultados/sweep.py --help` y el ejemplo en su docstring.
+
+**También conectado a los 7 notebooks de `Modelos iniciales/`** (todos salvo `tcn_iq_ap/`): la
+celda de configuración de cada uno tiene `DATA_SOURCE`/`SYNTHETIC_TRAIN_SAMPLES`/
+`SYNTHETIC_VAL_SAMPLES`/`SYNTHETIC_ESCALA`, y un hook `train_loader_fn` (mismo mecanismo que usa
+`sweep.py`) genera un lote nuevo por época. `curriculum` + datos sintéticos combinados no está
+soportado todavía (el notebook lo bloquea con un `assert`).
 
 ```python
 from generador import generar_lote, generador_infinito
