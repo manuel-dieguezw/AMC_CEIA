@@ -52,6 +52,15 @@ def to_amplitude_phase(X):
     return np.stack([amplitude, phase], axis=1).astype(X.dtype)
 
 
+def to_iq_amplitude_phase(X):
+    """Concatena I/Q (N, 2, L) con Amplitud/Fase derivada (N, 2, L), dando (N, 4, L):
+    canales I, Q, amplitud, fase. Pensado para modelos que reciben los 4 canales juntos y los
+    combinan ellos mismos (p. ej. reduciéndolos con una conv1d aprendida), en vez de fusionar
+    I/Q y A/φ en dos ramas separadas como `DualTCN`.
+    """
+    return np.concatenate([X, to_amplitude_phase(X)], axis=1)
+
+
 def augment_rotate_iq(X, y, snrs, angles=(np.pi / 2, np.pi, 3 * np.pi / 2)):
     """Data augmentation por rotación de la constelación I/Q (usada por ULCNN/`cnn_preproc`).
 

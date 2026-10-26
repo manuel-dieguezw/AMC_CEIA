@@ -88,6 +88,56 @@ class LSTMClassifier(nn.Module):
         return sum(p.numel() for p in self.parameters() if p.requires_grad)
 
 
+class SymbolReduceLSTM(nn.Module):
+    """LSTM que recibe I/Q + Amplitud/Fase (4 canales) y los reduce a pocos canales por símbolo
+    con una convolución 1D aprendida, en vez de darle a la LSTM una muestra por timestep.
+
+    RadioML 2016.10a genera cada señal con oversampling fijo (8 muestras por símbolo); agrupar
+    esas muestras con una `Conv1d(kernel_size=stride=samples_per_symbol)` reduce la longitud de
+    secuencia que ve la LSTM de 128 a 128/samples_per_symbol pasos — bajando mucho el cómputo y
+    la latencia de la recurrencia (no la cantidad de parámetros de la LSTM, que depende de
+    `hidden_size`, no de la longitud de secuencia).
+
+    `reduced_channels` es la cantidad de canales por símbolo que deja la conv1d: default 2, no 1,
+    porque I/Q/A/φ tienen 4 canales pero solo 2 grados de libertad reales por muestra (A y φ se
+    derivan de I y Q) — colapsar a 1 canal perdería esa información en vez de solo reorganizarla.
+    Espera entrada `(N, 4, L)` armada con `data.to_iq_amplitude_phase`.
+    """
+
+    def __init__(self, samples_per_symbol=8, reduced_channels=2, hidden_size=128, num_layers=2,
+                 n_classes=8, fc_hidden=64, dropout=0.5, input_norm=True):
+        super().__init__()
+        self.input_norm = nn.BatchNorm1d(4) if input_norm else None
+        self.symbol_reduce = nn.Conv1d(4, reduced_channels, kernel_size=samples_per_symbol,
+                                        stride=samples_per_symbol)
+        self.lstm = nn.LSTM(
+            input_size=reduced_channels,
+            hidden_size=hidden_size,
+            num_layers=num_layers,
+            batch_first=True,
+            # nn.LSTM no admite dropout con una sola capa
+            dropout=dropout if num_layers > 1 else 0.0,
+        )
+        self.classifier = nn.Sequential(
+            nn.Linear(hidden_size, fc_hidden),
+            nn.BatchNorm1d(fc_hidden),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(fc_hidden, n_classes),
+        )
+
+    def forward(self, x):
+        if self.input_norm is not None:
+            x = self.input_norm(x)
+        x = self.symbol_reduce(x)
+        x = x.permute(0, 2, 1)
+        out, _ = self.lstm(x)
+        return self.classifier(out[:, -1, :])
+
+    def count_parameters(self):
+        return sum(p.numel() for p in self.parameters() if p.requires_grad)
+
+
 class GRUClassifier(nn.Module):
     """GRU para clasificación de modulaciones. Más rápida y estable que LSTM.
 

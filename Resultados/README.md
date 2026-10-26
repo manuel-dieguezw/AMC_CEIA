@@ -58,6 +58,8 @@ Hay dos orígenes posibles para una etapa, y no se mezclan:
 
   **Conclusión: ninguno de los tres modos de curriculum (`acc`/`fixed`/`stage_val`) justifica usarlo en la comparación principal** del informe; si se reporta uno, usar `fixed` (etapa 4).
 
+  - **`etapa_6_params_iguales/`**: distinta a las anteriores — no varía augmentation/scheduler/curriculum, sino que lleva `cnn`/`tcn`/`gru`/`lstm` con `--params 9364` a la misma cantidad de parámetros que `ULCNN` (9.364, su tamaño `base`), para comparar arquitecturas a igual capacidad en vez de a igual receta. Resultado: CNN 0.387 (8.576 params) · TCN 0.481 (9.358) · LSTM 0.532 (9.229) · GRU 0.594 (9.267) · **ULCNN 0.647 (9.364)**. A esa capacidad, **ULCNN gana claro** — no es solo la más chica en su configuración `base`, también es la que mejor aprovecha una capacidad chica cuando se fuerza a las demás a bajar a su tamaño. CNN y TCN son las que peor aguantan la poda (cortan por early stopping a las 12 y 23 épocas, lejos de converger).
+
   Para comparar accuracy entre estas etapas, usar `Resultados/comparar_etapas.ipynb` (lee los `metricas.json`, no entrena nada).
 
 ## Corridas (`sweep/<id>/`)
